@@ -160,7 +160,6 @@ fun CatCompanion(
         // 全身精致猫咪 Canvas
         val primaryColor = MaterialTheme.colorScheme.primary
         val secondaryColor = MaterialTheme.colorScheme.secondary
-        val surfaceColor = MaterialTheme.colorScheme.surface
 
         Canvas(
             modifier = Modifier
