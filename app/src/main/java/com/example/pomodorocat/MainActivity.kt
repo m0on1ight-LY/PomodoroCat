@@ -13,17 +13,36 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.Pets
+import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.pomodorocat.data.MixerSettings
 import com.example.pomodorocat.data.PreferenceManager
+import com.example.pomodorocat.data.SettlementData
 import com.example.pomodorocat.data.TimerData
+import com.example.pomodorocat.data.repository.PomodoroRepository
 import com.example.pomodorocat.service.TimerService
+import com.example.pomodorocat.ui.screens.AnalyticsScreen
 import com.example.pomodorocat.ui.screens.MainScreen
+import com.example.pomodorocat.ui.screens.SanctuaryScreen
 import com.example.pomodorocat.ui.theme.PomodoroCatTheme
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+
+enum class AppTab(val title: String, val icon: ImageVector) {
+    FOCUS("专注", Icons.Rounded.Timer),
+    ANALYTICS("复盘", Icons.Rounded.BarChart),
+    SANCTUARY("猫舍", Icons.Rounded.Pets)
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -32,8 +51,9 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var prefManager: PreferenceManager
 
-    // 用于触发重绘的主题变动 State
+    // 用于触发重绘的主题与昼夜变动 State
     private var themeState by mutableStateOf(0)
+    private var darkModeState by mutableStateOf(0)
 
     // 连接前台计时服务
     private val connection = object : ServiceConnection {
@@ -66,69 +86,175 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         prefManager = PreferenceManager(this)
         themeState = prefManager.selectedTheme
+        darkModeState = prefManager.darkMode
 
         // 申请通知权限
         checkNotificationPermission()
 
-        // 启动并绑定前台计时服务，保证其生命周期与组件隔离，能在后台常驻
+        // 启动并绑定前台计时服务
         val intent = Intent(this, TimerService::class.java)
-        startService(intent) // 保证服务在 Activity 销毁后仍在后台驻守
+        startService(intent)
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
 
-        setContent {
-            PomodoroCatTheme(themeIndex = themeState) {
-                Surface(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // 如果已经连接上 Service，则订阅其 Flow 并渲染 UI；否则显示一个临时空态
-                    if (isBound && timerService != null) {
-                        val timerData by timerService!!.timerState.collectAsState()
-                        val mixerSettings by timerService!!.mixerSettings.collectAsState()
+        val repository = PomodoroRepository.getInstance(this)
 
-                        MainScreen(
-                            timerData = timerData,
-                            mixerSettings = mixerSettings,
-                            prefManager = prefManager,
-                            onStart = { 
-                                triggerServiceAction(TimerService.ACTION_START)
-                            },
-                            onPause = { 
-                                triggerServiceAction(TimerService.ACTION_PAUSE)
-                            },
-                            onResume = { 
-                                triggerServiceAction(TimerService.ACTION_RESUME)
-                            },
-                            onSkip = { 
-                                triggerServiceAction(TimerService.ACTION_SKIP)
-                            },
-                            onReset = {
-                                timerService?.resetTimer()
-                            },
-                            onMixerVolumeChange = { updatedSettings ->
-                                timerService?.updateMixerVolume(updatedSettings)
-                            },
-                            onThemeChanged = {
-                                // 用户在设置弹窗里修改了主题，触发 Activity 刷新
-                                themeState = prefManager.selectedTheme
+        setContent {
+            val coroutineScope = rememberCoroutineScope()
+            var currentTab by remember { mutableStateOf(AppTab.FOCUS) }
+
+            val tags by repository.allTags.collectAsState(initial = emptyList())
+            val allSessions by repository.allSessions.collectAsState(initial = emptyList())
+            val cats by repository.allCats.collectAsState(initial = emptyList())
+            val activeCat by repository.activeCat.collectAsState(initial = null)
+            val badges by repository.allBadges.collectAsState(initial = emptyList())
+
+            val timerData by (timerService?.timerState ?: remember { MutableStateFlow(TimerData()) }).collectAsState()
+            val mixerSettings by (timerService?.mixerSettings ?: remember { MutableStateFlow(MixerSettings()) }).collectAsState()
+
+            var activeSettlement by remember { mutableStateOf<SettlementData?>(null) }
+
+            LaunchedEffect(timerService) {
+                timerService?.settlementEvent?.collect { data ->
+                    activeSettlement = data
+                }
+            }
+
+            PomodoroCatTheme(themeIndex = themeState, darkModeSetting = darkModeState) {
+                Scaffold(
+                    bottomBar = {
+                        NavigationBar(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 8.dp
+                        ) {
+                            AppTab.values().forEach { tab ->
+                                NavigationBarItem(
+                                    selected = currentTab == tab,
+                                    onClick = { currentTab = tab },
+                                    icon = {
+                                        Icon(
+                                            imageVector = tab.icon,
+                                            contentDescription = tab.title
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = tab.title,
+                                            fontWeight = if (currentTab == tab) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        indicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                                        unselectedIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                                        unselectedTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                                    )
+                                )
                             }
-                        )
-                    } else {
-                        // 正在连接服务时的占位图，由于绑定极其迅速，通常眨眼即逝
-                        // 我们直接渲染一个静态的 Compose 空状态
-                        var fakeData by remember { mutableStateOf(TimerData()) }
-                        var fakeSettings by remember { mutableStateOf(MixerSettings()) }
-                        MainScreen(
-                            timerData = fakeData,
-                            mixerSettings = fakeSettings,
-                            prefManager = prefManager,
-                            onStart = {},
-                            onPause = {},
-                            onResume = {},
-                            onSkip = {},
-                            onReset = {},
-                            onMixerVolumeChange = {},
-                            onThemeChanged = {}
-                        )
+                        }
+                    }
+                ) { innerPadding ->
+                    Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                        when (currentTab) {
+                            AppTab.FOCUS -> {
+                                val isDarkEffective = darkModeState == 2 || (darkModeState == 0 && androidx.compose.foundation.isSystemInDarkTheme())
+                                MainScreen(
+                                    timerData = timerData,
+                                    mixerSettings = mixerSettings,
+                                    prefManager = prefManager,
+                                    tags = tags,
+                                    activeCat = activeCat,
+                                    fishBalance = prefManager.totalDriedFish,
+                                    settlementData = activeSettlement,
+                                    isDarkMode = isDarkEffective,
+                                    onToggleDarkMode = {
+                                        val newMode = if (isDarkEffective) 1 else 2
+                                        prefManager.darkMode = newMode
+                                        darkModeState = newMode
+                                    },
+                                    onDismissSettlement = { activeSettlement = null },
+                                    onSaveDiary = { rating, note ->
+                                        activeSettlement?.let { settlement ->
+                                            coroutineScope.launch {
+                                                repository.updateSessionRatingAndNote(settlement.sessionId, rating, note)
+                                            }
+                                        }
+                                    },
+                                    onTagSelected = { tag ->
+                                        timerService?.setActiveTag(tag.id, tag.name)
+                                    },
+                                    onAddNewTag = { name, iconKey, colorHex ->
+                                        coroutineScope.launch {
+                                            repository.createCustomTag(name, iconKey, colorHex)
+                                        }
+                                    },
+                                    onStart = { 
+                                        triggerServiceAction(TimerService.ACTION_START)
+                                    },
+                                    onPause = { 
+                                        triggerServiceAction(TimerService.ACTION_PAUSE)
+                                    },
+                                    onResume = { 
+                                        triggerServiceAction(TimerService.ACTION_RESUME)
+                                    },
+                                    onSkip = { 
+                                        triggerServiceAction(TimerService.ACTION_SKIP)
+                                    },
+                                    onReset = {
+                                        timerService?.resetTimer()
+                                    },
+                                    onSwitchSessionType = { type ->
+                                        timerService?.switchSessionType(type)
+                                    },
+                                    onMixerVolumeChange = { updatedSettings ->
+                                        timerService?.updateMixerVolume(updatedSettings)
+                                    },
+                                    onThemeChanged = {
+                                        themeState = prefManager.selectedTheme
+                                        darkModeState = prefManager.darkMode
+                                    }
+                                )
+                            }
+
+                            AppTab.ANALYTICS -> {
+                                AnalyticsScreen(
+                                    sessions = allSessions
+                                )
+                            }
+
+                            AppTab.SANCTUARY -> {
+                                SanctuaryScreen(
+                                    cats = cats,
+                                    badges = badges,
+                                    fishBalance = prefManager.totalDriedFish,
+                                    onSelectCat = { catId ->
+                                        coroutineScope.launch {
+                                            repository.setActiveCat(catId)
+                                        }
+                                    },
+                                    onUnlockCat = { catId, cost ->
+                                        coroutineScope.launch {
+                                            val success = repository.unlockCat(catId, cost)
+                                            if (success) {
+                                                Toast.makeText(this@MainActivity, "🎉 成功解锁新猫咪伙伴！", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(this@MainActivity, "小鱼干不足喵~ 快去专注赚鱼干吧！", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    onFeedCat = {
+                                        coroutineScope.launch {
+                                            val success = repository.feedActiveCat()
+                                            if (success) {
+                                                Toast.makeText(this@MainActivity, "🐟 投喂成功！亲密度 +10 EXP ✨", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(this@MainActivity, "小鱼干不足 10 条喵，快去专注吧！", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }

@@ -28,7 +28,9 @@ data class TimerData(
     val remainingMillis: Long = 25 * 60 * 1000L, // 默认 25 分钟
     val totalMillis: Long = 25 * 60 * 1000L,
     val completedPomodoros: Int = 0,             // 今日已完成番茄个数
-    val targetPomodoros: Int = 4                 // 目标完成个数 (大循环周期)
+    val targetPomodoros: Int = 4,                // 目标完成个数 (大循环周期)
+    val activeTagId: String = "work",            // 当前绑定的任务标签 ID
+    val activeTagName: String = "工作"           // 当前绑定的任务标签名称
 )
 
 /**
@@ -40,3 +42,14 @@ data class MixerSettings(
     val oceanVolume: Float = 0f,
     val forestVolume: Float = 0f
 )
+
+/**
+ * 专注完成结算数据
+ */
+data class SettlementData(
+    val sessionId: Long = 0,
+    val durationMinutes: Int = 25,
+    val earnedFish: Int = 25,
+    val tagName: String = "工作"
+)
+

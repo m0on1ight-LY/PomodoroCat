@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -49,6 +50,17 @@ fun TimerDisplay(
     val secondaryColor = MaterialTheme.colorScheme.secondary
     val neutralColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.08f)
 
+    // 缓存渐变 Brush，避免重绘时每帧分配对象
+    val gradientBrush = remember(primaryColor, secondaryColor) {
+        Brush.sweepGradient(
+            colors = listOf(
+                secondaryColor,
+                primaryColor,
+                secondaryColor
+            )
+        )
+    }
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -72,16 +84,7 @@ fun TimerDisplay(
                 style = Stroke(width = strokeWidth)
             )
 
-            // 2. 绘制前景带颜色圆环 (使用渐变色)
-            val gradientBrush = Brush.sweepGradient(
-                colors = listOf(
-                    secondaryColor,
-                    primaryColor,
-                    secondaryColor
-                ),
-                center = Offset(size.width / 2f, size.height / 2f)
-            )
-
+            // 2. 绘制前景带颜色圆环 (使用缓存的渐变色)
             drawArc(
                 brush = gradientBrush,
                 startAngle = -90f,

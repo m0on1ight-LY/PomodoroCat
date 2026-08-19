@@ -119,9 +119,51 @@ fun SettingsDialog(
 
                 Divider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
 
-                // 6. 主题切换
+                // 6. 昼夜模式切换
                 Text(
-                    text = "猫咪外套配色 (主题)",
+                    text = "🌓 显示模式 (深色/浅色)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                var darkModeSetting by remember { mutableStateOf(prefManager.darkMode) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val modeOptions = listOf(0 to "📱 跟随系统", 1 to "☀️ 浅色", 2 to "🌙 深色")
+                    modeOptions.forEach { (mode, label) ->
+                        val isSelected = darkModeSetting == mode
+                        OutlinedButton(
+                            onClick = { darkModeSetting = mode },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonBorder.let {
+                                if (isSelected) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+                                else ButtonDefaults.outlinedButtonColors()
+                            },
+                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                                width = if (isSelected) 2.dp else 1.dp
+                            ),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 6.dp, horizontal = 4.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 7. 主题切换
+                Text(
+                    text = "🎨 猫咪外套配色 (主题色)",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -158,6 +200,7 @@ fun SettingsDialog(
                             prefManager.targetPomodoros = targetPomodoros
                             prefManager.autoStartBreak = autoStartBreak
                             prefManager.autoStartWork = autoStartWork
+                            prefManager.darkMode = darkModeSetting
                             prefManager.selectedTheme = themeIndex
                             onSaved()
                         },
@@ -166,6 +209,18 @@ fun SettingsDialog(
                         Text("保存设置")
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 版本号脚标
+                Text(
+                    text = "🐾 番茄猫 v2.0.0 (Cat Sanctuary Edition)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
             }
         }
     }

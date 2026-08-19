@@ -66,10 +66,17 @@ private val DarkColorScheme = darkColorScheme(
 @Composable
 fun PomodoroCatTheme(
     themeIndex: Int = 0, // 0: 粉萌, 1: 森绿, 2: 向日黄
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkModeSetting: Int = 0, // 0: 跟随系统, 1: 浅色, 2: 深色
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) {
+    val isSystemDark = isSystemInDarkTheme()
+    val isDark = when (darkModeSetting) {
+        1 -> false
+        2 -> true
+        else -> isSystemDark
+    }
+
+    val colorScheme = if (isDark) {
         val primaryColor = when (themeIndex) {
             1 -> GreenSecondary
             2 -> YellowSecondary
@@ -93,7 +100,7 @@ fun PomodoroCatTheme(
         }
     }
 
-    LocalViewContextForStatusbarOrHeader(colorScheme, darkTheme)
+    LocalViewContextForStatusbarOrHeader(colorScheme, isDark)
 
     MaterialTheme(
         colorScheme = colorScheme,
